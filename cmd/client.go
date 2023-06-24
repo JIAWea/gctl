@@ -3,8 +3,6 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"github.com/ml444/gctl/config"
-	"github.com/ml444/gctl/util"
 	"go/build"
 	"io/fs"
 	"os"
@@ -13,6 +11,9 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/ml444/gctl/config"
+	"github.com/ml444/gctl/util"
 
 	"github.com/ml444/gctl/parser"
 	log "github.com/ml444/glog"
@@ -197,6 +198,11 @@ func GenerateProtobuf(pd *parser.ProtoData, basePath string, needGenGrpcPb bool)
 	if goPath == "" {
 		goPath = build.Default.GOPATH
 	}
+	goPathList := strings.Split(goPath, ";")
+	if len(goPathList) > 0 {
+		goPath = goPathList[0]
+	}
+
 	protoGenGoPath := filepath.ToSlash(filepath.Join(goPath, "bin", protoGenGoName))
 	args = append(args, fmt.Sprintf("--plugin=protoc-gen-go=%s", protoGenGoPath))
 	args = append(args, fmt.Sprintf("--go_out=%s", filepath.ToSlash(basePath)))
