@@ -1,12 +1,14 @@
 package parser
 
 import (
-	"github.com/ml444/gctl/util"
-	log "github.com/ml444/glog"
-	"github.com/spf13/viper"
+	"path"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/ml444/gctl/util"
+	log "github.com/ml444/glog"
+	"github.com/spf13/viper"
 )
 
 func ParseTemplateToFile(pd *ProtoData, basePath, tempDir, tempName string, funcMap template.FuncMap) error {
@@ -19,7 +21,7 @@ func GenerateTemplate(fPath, tempFile, tempName string, data interface{}, funcMa
 	if err != nil {
 		return err
 	}
-	temp := template.New(tempName)
+	temp := template.New(path.Base(tempName))
 	if funcMap != nil {
 		temp.Funcs(funcMap)
 	}
