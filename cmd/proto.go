@@ -1,11 +1,8 @@
 package cmd
 
 import (
-	"fmt"
 	"github.com/ml444/gctl/config"
 	"github.com/ml444/gctl/util"
-	"path/filepath"
-	"strings"
 
 	"github.com/ml444/gctl/parser"
 	log "github.com/ml444/glog"
@@ -24,30 +21,23 @@ var protoCmd = &cobra.Command{
 		if serviceGroup == "" {
 			serviceGroup = config.DefaultSvcGroup
 		}
-		tmpPath := GetTemplateProtoDir()
-		tmpName := config.TmplConfigFile.Template.ProtoFilename
-		modulePrefix := JoinModulePrefixWithGroup()
-		targetFilepath := GetProtoAbsPath(protoName)
+		//modulePrefix := config.JoinModulePrefixWithGroup(serviceGroup)
+		targetFilepath := config.GetTargetProtoAbsPath(serviceGroup, protoName)
 		if util.IsFileExist(targetFilepath) {
 			log.Errorf("%s is existed", targetFilepath)
 			return
 		}
-		data := map[string]interface{}{
-			"ModulePrefix":    modulePrefix,
-			"PackageName":     protoName,
-			"ServiceName":     protoName,
-			"CaseServiceName": fmt.Sprintf("%s%s", strings.ToTitle(protoName[:1]), protoName[1:]),
+		pd := parser.ParseData{
+			PackageName:  protoName,
+			ModulePrefix: config.JoinModulePrefixWithGroup(serviceGroup),
 		}
+
 		var firstErrcode = 1
 		var endErrCode = 1 << 31
 		if config.EnableAssignErrcode {
 			var err error
 			var errCode int
-			svcAssign := util.NewSvcAssign(
-				config.DbDSN, protoName, serviceGroup,
-				config.SvcPortInterval, config.SvcErrcodeInterval,
-				config.SvcGroupInitPortMap, config.SvcGroupInitErrcodeMap,
-			)
+			svcAssign := util.NewSvcAssign(protoName, serviceGroup)
 			err = svcAssign.GetOrAssignPortAndErrcode(nil, &errCode)
 			if err != nil {
 				log.Error(err)
@@ -58,70 +48,18 @@ var protoCmd = &cobra.Command{
 				endErrCode = errCode + config.SvcErrcodeInterval - 1
 			}
 		}
-		data["StartErrCode"] = firstErrcode
-		data["EndErrCode"] = endErrCode
+		pd.StartErrCode = firstErrcode
+		pd.EndErrCode = endErrCode
 
 		err := parser.GenerateTemplate(
 			targetFilepath,
-			filepath.Join(tmpPath, tmpName),
-			tmpName,
-			data,
-			funcMap,
+			config.GetTempProtoAbsPath(),
+			pd,
 		)
 		if err != nil {
 			log.Error(err.Error())
 			return
 		}
+		log.Info("generate proto file success: ", targetFilepath)
 	},
-}
-
-const (
-	ProtoFileSuffix = ".proto"
-	ServiceNameVar  = "{SERVICE_NAME}"
-)
-
-func GetProtoAbsPath(protoName string) string {
-	if filepath.IsAbs(protoName) {
-		return protoName
-	}
-	var elems []string
-	repoPath := config.ProtoCentralRepoPath
-	if repoPath != "" {
-		elems = append(elems, repoPath)
-	} else {
-		elems = append(elems, filepath.Join(config.TargetRootPath, config.GoModulePrefix))
-	}
-	if serviceGroup != "" {
-		elems = append(elems, serviceGroup)
-	}
-	serviceName := protoName
-	if strings.HasSuffix(protoName, ProtoFileSuffix) {
-		serviceName = strings.TrimSuffix(serviceName, ProtoFileSuffix)
-	} else {
-		protoName = fmt.Sprintf("%s.proto", protoName)
-	}
-	if repoPath == "" {
-		for _, el := range config.TmplConfigFile.Target.RelativeDir.Proto {
-			elems = append(elems, strings.ReplaceAll(el, ServiceNameVar, serviceName))
-		}
-	}
-
-	elems = append(elems, protoName)
-	return filepath.Join(elems...)
-}
-
-func JoinModulePrefixWithGroup() string {
-	modulePrefix := config.GoModulePrefix
-	if serviceGroup != "" {
-		return filepath.Join(modulePrefix, serviceGroup)
-	}
-	return modulePrefix
-}
-
-func GetTemplateProtoDir() string {
-	var elems []string
-	elems = append(elems, config.TmplRootDir)
-	elems = append(elems, config.TmplConfigFile.Template.RelativeDir.Proto...)
-	//elems = append(elems, templateConfigFile.TemplateProtoFilename)
-	return filepath.Join(elems...)
 }
